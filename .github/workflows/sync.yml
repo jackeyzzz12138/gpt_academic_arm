@@ -1,41 +1,39 @@
-# The file from ChatGPTNextWeb/ChatGPT-Next-Web
-name: Upstream Sync
-
-permissions:
-  contents: write
+name: Sync with Upstream
 
 on:
   schedule:
-    - cron: "0 0 * * *" # every day at 00:00 AM
-  workflow_dispatch:
+    - cron: '0 7 * * 1,4' # 周一周四7点触发
+  push:
+    branches:
+      - arm
+  workflow_dispatch: # 允许手动触发
 
 jobs:
-  sync_latest_from_upstream:
-    name: Sync latest commits from upstream repo
+  sync:
     runs-on: ubuntu-latest
-    if: ${{ github.event.repository.fork }}
-
     steps:
-      # Step 1: run a standard checkout action
-      - name: Checkout target repo
-        uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      # Step 2: run the sync action
-      - name: Sync upstream changes
-        id: sync
-        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
-        with:
-          upstream_sync_repo: binary-husky/gpt_academic
-          upstream_sync_branch: master
-          target_sync_branch: arm
-          target_repo_token: ${{ secrets.GITHUB_TOKEN }} # automatically generated, no need to set
-
-          # Set test_mode true to run tests instead of the true action!!
-          test_mode: false
-
-      - name: Sync check
-        if: failure()
-        run: |
-          echo "[Error] 由于上游仓库的 workflow 文件变更，导致 GitHub 自动暂停了本次自动更新，你需要手动 Sync Fork 一次.
-          echo "[Error] Due to a change in the workflow file of the upstream repository, GitHub has automatically suspended the scheduled automatic update. You need to manually sync your fork.
-          exit 1
+    - name: Sync with Upstream
+      uses: repo-sync/github-sync@v2
+      with:
+        source_repo: "binary-husky/gpt_academic" 
+        source_branch: "master" # 上游仓库的默认分支
+        destination_branch: "master" # 你的分支
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Checkout ARM Branch
+      uses: actions/checkout@v4
+      with:
+        ref: 'arm' # 切换到arm分支
+    
+    - name: Merge Master into ARM
+      run: |
+        git config --global user.email "github-actions@github.com"
+        git config --global user.name "github-actions"
+        git merge origin/master
+        git commit -m "merge from master"
+        git push origin arm 
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

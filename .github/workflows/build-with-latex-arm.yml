@@ -2,9 +2,8 @@
 name: build-with-latex
 
 on:
-  push:
-    branches:
-      - 'arm'
+  schedule:
+    - cron: '0 7 * * 0'
 
 env:
   REGISTRY: ghcr.io

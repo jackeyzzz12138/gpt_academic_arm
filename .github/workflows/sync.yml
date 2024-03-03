@@ -32,7 +32,7 @@ jobs:
         run: |
           git config --global user.email "github-actions@github.com"
           git config --global user.name "github-actions"
-          git merge master
+          git merge origin/master
           git commit -m "merge from master"
           git push origin arm
         env:

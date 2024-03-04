@@ -3,7 +3,7 @@ name: build-with-latex
 
 on:
   schedule:
-    - cron: '0 7 * * 0'
+    - cron: '0 7 * * 0' # every Sunday at 7:00 UTC
 
 env:
   REGISTRY: ghcr.io

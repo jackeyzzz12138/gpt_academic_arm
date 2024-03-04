@@ -3,15 +3,25 @@ name: Sync with Upstream
 on:
   schedule:
     - cron: "0 7 * * 1,4" # 周一周四7点触发
-  push:
-    branches:
-      - arm
   workflow_dispatch: # 允许手动触发
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Sync with Upstream
+        uses: repo-sync/github-sync@v2
+        with:
+          source_repo: "binary-husky/gpt_academic"
+          source_branch: "master" # 上游仓库的默认分支
+          destination_branch: "master" # 你的分支
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: sync
         uses: tgymnich/fork-sync@v1.9.0
         with:

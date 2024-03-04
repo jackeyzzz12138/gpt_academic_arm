@@ -12,28 +12,38 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: sync
+        uses: tgymnich/fork-sync@v1.9.0
         with:
-          fetch-depth: 0
+          owner: binary-husky
+          head: master
+          base: arm
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync with Upstream
-        uses: repo-sync/github-sync@v2
-        with:
-          source_repo: "binary-husky/gpt_academic"
-          source_branch: "master" # 上游仓库的默认分支
-          destination_branch: "master" # 你的分支
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Checkout
+      #   uses: actions/checkout@v4
+      #   with:
+      #     fetch-depth: 0
 
-      - name: Checkout ARM Branch
-        run: git checkout arm
+      # - name: Sync with Upstream
+      #   uses: repo-sync/github-sync@v2
+      #   with:
+      #     source_repo: "binary-husky/gpt_academic"
+      #     source_branch: "master" # 上游仓库的默认分支
+      #     destination_branch: "master" # 你的分支
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge Master into ARM
-        run: |
-          git config --global user.email "github-actions@github.com"
-          git config --global user.name "github-actions"
-          git merge origin/master
-          git commit -m "merge from master"
-          git push origin arm
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Add remote upstream
+      #   run: git remote add upstream https://github.com/binary-husky/gpt_academic.git
+
+      # - name: Checkout ARM Branch
+      #   run: git checkout arm
+
+      # - name: Merge Master into ARM
+      #   run: |
+      #     git config --global user.email "github-actions@github.com"
+      #     git config --global user.name "github-actions"
+      #     git merge origin/master --no-edit
+      #     git push origin arm
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -8,10 +8,10 @@
     具备多线程调用能力的函数：在函数插件中被调用，灵活而简洁
     2. predict_no_ui_long_connection(...)
 """
-import tiktoken, copy
+import tiktoken, copy, re
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
-from toolbox import get_conf, trimmed_format_exc, apply_gpt_academic_string_mask
+from toolbox import get_conf, trimmed_format_exc, apply_gpt_academic_string_mask, read_one_api_model_name
 
 from .bridge_chatgpt import predict_no_ui_long_connection as chatgpt_noui
 from .bridge_chatgpt import predict as chatgpt_ui
@@ -61,6 +61,10 @@ API_URL_REDIRECT, AZURE_ENDPOINT, AZURE_ENGINE = get_conf("API_URL_REDIRECT", "A
 openai_endpoint = "https://api.openai.com/v1/chat/completions"
 api2d_endpoint = "https://openai.api2d.net/v1/chat/completions"
 newbing_endpoint = "wss://sydney.bing.com/sydney/ChatHub"
+gemini_endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+claude_endpoint = "https://api.anthropic.com/v1/messages"
+yimodel_endpoint = "https://api.lingyiwanwu.com/v1/chat/completions"
+
 if not AZURE_ENDPOINT.endswith('/'): AZURE_ENDPOINT += '/'
 azure_endpoint = AZURE_ENDPOINT + f'openai/deployments/{AZURE_ENGINE}/chat/completions?api-version=2023-05-15'
 # 兼容旧版的配置
@@ -75,7 +79,9 @@ except:
 if openai_endpoint in API_URL_REDIRECT: openai_endpoint = API_URL_REDIRECT[openai_endpoint]
 if api2d_endpoint in API_URL_REDIRECT: api2d_endpoint = API_URL_REDIRECT[api2d_endpoint]
 if newbing_endpoint in API_URL_REDIRECT: newbing_endpoint = API_URL_REDIRECT[newbing_endpoint]
-
+if gemini_endpoint in API_URL_REDIRECT: gemini_endpoint = API_URL_REDIRECT[gemini_endpoint]
+if claude_endpoint in API_URL_REDIRECT: claude_endpoint = API_URL_REDIRECT[claude_endpoint]
+if yimodel_endpoint in API_URL_REDIRECT: yimodel_endpoint = API_URL_REDIRECT[yimodel_endpoint]
 
 # 获取tokenizer
 tokenizer_gpt35 = LazyloadTiktoken("gpt-3.5-turbo")
@@ -291,7 +297,7 @@ model_info = {
     "gemini-pro": {
         "fn_with_ui": genai_ui,
         "fn_without_ui": genai_noui,
-        "endpoint": None,
+        "endpoint": gemini_endpoint,
         "max_token": 1024 * 32,
         "tokenizer": tokenizer_gpt35,
         "token_cnt": get_token_num_gpt35,
@@ -299,7 +305,7 @@ model_info = {
     "gemini-pro-vision": {
         "fn_with_ui": genai_ui,
         "fn_without_ui": genai_noui,
-        "endpoint": None,
+        "endpoint": gemini_endpoint,
         "max_token": 1024 * 32,
         "tokenizer": tokenizer_gpt35,
         "token_cnt": get_token_num_gpt35,
@@ -312,6 +318,7 @@ model_info.update({
     "moonshot-v1-8k": {
         "fn_with_ui": moonshot_ui,
         "fn_without_ui": moonshot_no_ui,
+        "can_multi_thread": True,
         "endpoint": None,
         "max_token": 1024 * 8,
         "tokenizer": tokenizer_gpt35,
@@ -320,6 +327,7 @@ model_info.update({
     "moonshot-v1-32k": {
         "fn_with_ui": moonshot_ui,
         "fn_without_ui": moonshot_no_ui,
+        "can_multi_thread": True,
         "endpoint": None,
         "max_token": 1024 * 32,
         "tokenizer": tokenizer_gpt35,
@@ -328,6 +336,7 @@ model_info.update({
     "moonshot-v1-128k": {
         "fn_with_ui": moonshot_ui,
         "fn_without_ui": moonshot_no_ui,
+        "can_multi_thread": True,
         "endpoint": None,
         "max_token": 1024 * 128,
         "tokenizer": tokenizer_gpt35,
@@ -349,25 +358,57 @@ for model in AVAIL_LLM_MODELS:
         model_info.update({model: mi})
 
 # -=-=-=-=-=-=- 以下部分是新加入的模型，可能附带额外依赖 -=-=-=-=-=-=-
-if "claude-1-100k" in AVAIL_LLM_MODELS or "claude-2" in AVAIL_LLM_MODELS:
+# claude家族
+claude_models = ["claude-instant-1.2","claude-2.0","claude-2.1","claude-3-sonnet-20240229","claude-3-opus-20240229"]
+if any(item in claude_models for item in AVAIL_LLM_MODELS):
     from .bridge_claude import predict_no_ui_long_connection as claude_noui
     from .bridge_claude import predict as claude_ui
     model_info.update({
-        "claude-1-100k": {
+        "claude-instant-1.2": {
             "fn_with_ui": claude_ui,
             "fn_without_ui": claude_noui,
-            "endpoint": None,
-            "max_token": 8196,
+            "endpoint": claude_endpoint,
+            "max_token": 100000,
             "tokenizer": tokenizer_gpt35,
             "token_cnt": get_token_num_gpt35,
         },
     })
     model_info.update({
-        "claude-2": {
+        "claude-2.0": {
             "fn_with_ui": claude_ui,
             "fn_without_ui": claude_noui,
-            "endpoint": None,
-            "max_token": 8196,
+            "endpoint": claude_endpoint,
+            "max_token": 100000,
+            "tokenizer": tokenizer_gpt35,
+            "token_cnt": get_token_num_gpt35,
+        },
+    })
+    model_info.update({
+        "claude-2.1": {
+            "fn_with_ui": claude_ui,
+            "fn_without_ui": claude_noui,
+            "endpoint": claude_endpoint,
+            "max_token": 200000,
+            "tokenizer": tokenizer_gpt35,
+            "token_cnt": get_token_num_gpt35,
+        },
+    })
+    model_info.update({
+        "claude-3-sonnet-20240229": {
+            "fn_with_ui": claude_ui,
+            "fn_without_ui": claude_noui,
+            "endpoint": claude_endpoint,
+            "max_token": 200000,
+            "tokenizer": tokenizer_gpt35,
+            "token_cnt": get_token_num_gpt35,
+        },
+    })
+    model_info.update({
+        "claude-3-opus-20240229": {
+            "fn_with_ui": claude_ui,
+            "fn_without_ui": claude_noui,
+            "endpoint": claude_endpoint,
+            "max_token": 200000,
             "tokenizer": tokenizer_gpt35,
             "token_cnt": get_token_num_gpt35,
         },
@@ -437,22 +478,6 @@ if "stack-claude" in AVAIL_LLM_MODELS:
             "token_cnt": get_token_num_gpt35,
         }
     })
-if "newbing-free" in AVAIL_LLM_MODELS:
-    try:
-        from .bridge_newbingfree import predict_no_ui_long_connection as newbingfree_noui
-        from .bridge_newbingfree import predict as newbingfree_ui
-        model_info.update({
-            "newbing-free": {
-                "fn_with_ui": newbingfree_ui,
-                "fn_without_ui": newbingfree_noui,
-                "endpoint": newbing_endpoint,
-                "max_token": 4096,
-                "tokenizer": tokenizer_gpt35,
-                "token_cnt": get_token_num_gpt35,
-            }
-        })
-    except:
-        print(trimmed_format_exc())
 if "newbing" in AVAIL_LLM_MODELS:   # same with newbing-free
     try:
         from .bridge_newbingfree import predict_no_ui_long_connection as newbingfree_noui
@@ -485,6 +510,7 @@ if "chatglmft" in AVAIL_LLM_MODELS:   # same with newbing-free
         })
     except:
         print(trimmed_format_exc())
+# -=-=-=-=-=-=- 上海AI-LAB书生大模型 -=-=-=-=-=-=-
 if "internlm" in AVAIL_LLM_MODELS:
     try:
         from .bridge_internlm import predict_no_ui_long_connection as internlm_noui
@@ -517,6 +543,7 @@ if "chatglm_onnx" in AVAIL_LLM_MODELS:
         })
     except:
         print(trimmed_format_exc())
+# -=-=-=-=-=-=- 通义-本地模型 -=-=-=-=-=-=-
 if "qwen-local" in AVAIL_LLM_MODELS:
     try:
         from .bridge_qwen_local import predict_no_ui_long_connection as qwen_local_noui
@@ -534,6 +561,7 @@ if "qwen-local" in AVAIL_LLM_MODELS:
         })
     except:
         print(trimmed_format_exc())
+# -=-=-=-=-=-=- 通义-在线模型 -=-=-=-=-=-=-
 if "qwen-turbo" in AVAIL_LLM_MODELS or "qwen-plus" in AVAIL_LLM_MODELS or "qwen-max" in AVAIL_LLM_MODELS:   # zhipuai
     try:
         from .bridge_qwen import predict_no_ui_long_connection as qwen_noui
@@ -569,7 +597,35 @@ if "qwen-turbo" in AVAIL_LLM_MODELS or "qwen-plus" in AVAIL_LLM_MODELS or "qwen-
         })
     except:
         print(trimmed_format_exc())
-if "spark" in AVAIL_LLM_MODELS:   # 讯飞星火认知大模型
+# -=-=-=-=-=-=- 零一万物模型 -=-=-=-=-=-=-
+if "yi-34b-chat-0205" in AVAIL_LLM_MODELS or "yi-34b-chat-200k" in AVAIL_LLM_MODELS:   # zhipuai
+    try:
+        from .bridge_yimodel import predict_no_ui_long_connection as yimodel_noui
+        from .bridge_yimodel import predict as yimodel_ui
+        model_info.update({
+            "yi-34b-chat-0205": {
+                "fn_with_ui": yimodel_ui,
+                "fn_without_ui": yimodel_noui,
+                "can_multi_thread": False,  # 目前来说，默认情况下并发量极低，因此禁用
+                "endpoint": yimodel_endpoint,
+                "max_token": 4000,
+                "tokenizer": tokenizer_gpt35,
+                "token_cnt": get_token_num_gpt35,
+            },
+            "yi-34b-chat-200k": {
+                "fn_with_ui": yimodel_ui,
+                "fn_without_ui": yimodel_noui,
+                "can_multi_thread": False,  # 目前来说，默认情况下并发量极低，因此禁用
+                "endpoint": yimodel_endpoint,
+                "max_token": 200000,
+                "tokenizer": tokenizer_gpt35,
+                "token_cnt": get_token_num_gpt35,
+            },
+        })
+    except:
+        print(trimmed_format_exc())
+# -=-=-=-=-=-=- 讯飞星火认知大模型 -=-=-=-=-=-=-
+if "spark" in AVAIL_LLM_MODELS:
     try:
         from .bridge_spark import predict_no_ui_long_connection as spark_noui
         from .bridge_spark import predict as spark_ui
@@ -645,6 +701,7 @@ if "llama2" in AVAIL_LLM_MODELS:   # llama2
         })
     except:
         print(trimmed_format_exc())
+# -=-=-=-=-=-=- 智谱 -=-=-=-=-=-=-
 if "zhipuai" in AVAIL_LLM_MODELS:   # zhipuai 是glm-4的别名，向后兼容配置
     try:
         model_info.update({
@@ -659,6 +716,7 @@ if "zhipuai" in AVAIL_LLM_MODELS:   # zhipuai 是glm-4的别名，向后兼容�
         })
     except:
         print(trimmed_format_exc())
+# -=-=-=-=-=-=- 幻方-深度求索大模型 -=-=-=-=-=-=-
 if "deepseekcoder" in AVAIL_LLM_MODELS:   # deepseekcoder
     try:
         from .bridge_deepseekcoder import predict_no_ui_long_connection as deepseekcoder_noui
@@ -675,26 +733,34 @@ if "deepseekcoder" in AVAIL_LLM_MODELS:   # deepseekcoder
         })
     except:
         print(trimmed_format_exc())
-# if "skylark" in AVAIL_LLM_MODELS:
-#     try:
-#         from .bridge_skylark2 import predict_no_ui_long_connection as skylark_noui
-#         from .bridge_skylark2 import predict as skylark_ui
-#         model_info.update({
-#             "skylark": {
-#                 "fn_with_ui": skylark_ui,
-#                 "fn_without_ui": skylark_noui,
-#                 "endpoint": None,
-#                 "max_token": 4096,
-#                 "tokenizer": tokenizer_gpt35,
-#                 "token_cnt": get_token_num_gpt35,
-#             }
-#         })
-#     except:
-#         print(trimmed_format_exc())
 
 
-# <-- 用于定义和切换多个azure模型 -->
-AZURE_CFG_ARRAY = get_conf("AZURE_CFG_ARRAY")
+# -=-=-=-=-=-=- one-api 对齐支持 -=-=-=-=-=-=-
+for model in [m for m in AVAIL_LLM_MODELS if m.startswith("one-api-")]:
+    # 为了更灵活地接入one-api多模型管理界面，设计了此接口，例子：AVAIL_LLM_MODELS = ["one-api-mixtral-8x7b(max_token=6666)"]
+    # 其中
+    #   "one-api-"          是前缀（必要）
+    #   "mixtral-8x7b"      是模型名（必要）
+    #   "(max_token=6666)"  是配置（非必要）
+    try:
+        _, max_token_tmp = read_one_api_model_name(model)
+    except:
+        print(f"one-api模型 {model} 的 max_token 配置不是整数，请检查配置文件。")
+        continue
+    model_info.update({
+        model: {
+            "fn_with_ui": chatgpt_ui,
+            "fn_without_ui": chatgpt_noui,
+            "endpoint": openai_endpoint,
+            "max_token": max_token_tmp,
+            "tokenizer": tokenizer_gpt35,
+            "token_cnt": get_token_num_gpt35,
+        },
+    })
+
+
+# -=-=-=-=-=-=- azure模型对齐支持 -=-=-=-=-=-=-
+AZURE_CFG_ARRAY = get_conf("AZURE_CFG_ARRAY") # <-- 用于定义和切换多个azure模型 -->
 if len(AZURE_CFG_ARRAY) > 0:
     for azure_model_name, azure_cfg_dict in AZURE_CFG_ARRAY.items():
         # 可能会覆盖之前的配置，但这是意料之中的
@@ -788,7 +854,8 @@ def predict_no_ui_long_connection(inputs, llm_kwargs, history, sys_prompt, obser
                 # 观察窗（window）
                 chat_string = []
                 for i in range(n_model):
-                    chat_string.append( f"【{str(models[i])} 说】: <font color=\"{colors[i]}\"> {window_mutex[i][0]} </font>" )
+                    color = colors[i%len(colors)]
+                    chat_string.append( f"【{str(models[i])} 说】: <font color=\"{color}\"> {window_mutex[i][0]} </font>" )
                 res = '<br/><br/>\n\n---\n\n'.join(chat_string)
                 # # # # # # # # # # #
                 observe_window[0] = res
@@ -805,7 +872,8 @@ def predict_no_ui_long_connection(inputs, llm_kwargs, history, sys_prompt, obser
             time.sleep(1)
 
         for i, future in enumerate(futures):  # wait and get
-            return_string_collect.append( f"【{str(models[i])} 说】: <font color=\"{colors[i]}\"> {future.result()} </font>" )
+            color = colors[i%len(colors)]
+            return_string_collect.append( f"【{str(models[i])} 说】: <font color=\"{color}\"> {future.result()} </font>" )
 
         window_mutex[-1] = False # stop mutex thread
         res = '<br/><br/>\n\n---\n\n'.join(return_string_collect)

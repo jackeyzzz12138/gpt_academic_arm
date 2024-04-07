@@ -1,4 +1,4 @@
-https://public.agent-matrix.com/publish/gradio-3.32.8-py3-none-any.whl
+https://public.agent-matrix.com/publish/gradio-3.32.9-py3-none-any.whl
 gradio-client==0.8
 pypdf2==2.12.1
 zhipuai>=2
@@ -8,6 +8,7 @@ pydantic==2.5.2
 protobuf==3.18
 transformers>=4.27.1
 scipdf_parser>=0.52
+anthropic>=0.18.1
 python-markdown-math
 pymdown-extensions
 websocket-client
@@ -16,7 +17,6 @@ prompt_toolkit
 latex2mathml
 python-docx
 mdtex2html
-anthropic
 pyautogen
 colorama
 Markdown

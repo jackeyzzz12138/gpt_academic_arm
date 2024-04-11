@@ -26,6 +26,7 @@ jobs:
         uses: tgymnich/fork-sync@v1.9.0
         with:
           owner: binary-husky
+          repo: gpt_academics
           head: master
           base: arm
           token: ${{ secrets.GITHUB_TOKEN }}

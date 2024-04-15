@@ -1,3 +1,8 @@
+> [!WARNING]
+> 本仓库只提供上游仓库的 arm docker 镜像, 欢迎issue和PR。  
+> 由于仓库名称变更，导致package名称变更，请使用 
+> ``` docker pull ghcr.io/jackeyzzz12138/gpt_academic_arm_with_latex_arm:arm ``` 以拉取最新的镜像。
+
 > [!IMPORTANT]
 > 2024.3.11: 恭迎Claude3和Moonshot，全力支持Qwen、GLM、DeepseekCoder等中文大语言模型！  
 > 2024.1.18: 更新3.70版本，支持Mermaid绘图库（让大模型绘制脑图）  

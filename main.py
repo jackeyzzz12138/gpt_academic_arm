@@ -26,7 +26,7 @@ def enable_log(PATH_LOGGING):
 
 def main():
     import gradio as gr
-    if gr.__version__ not in ['3.32.9']:
+    if gr.__version__ not in ['3.32.9', '3.32.10']:
         raise ModuleNotFoundError("使用项目内置Gradio获取最优体验! 请运行 `pip install -r requirements.txt` 指令安装内置Gradio及其他依赖, 详情信息见requirements.txt.")
     from request_llms.bridge_all import predict
     from toolbox import format_io, find_free_port, on_file_uploaded, on_report_generated, get_conf, ArgsGeneralWrapper, DummyWith
@@ -364,8 +364,9 @@ def main():
         def warm_up_mods(): time.sleep(6); warm_up_modules()
 
         threading.Thread(target=auto_updates, name="self-upgrade", daemon=True).start() # 查看自动更新
-        threading.Thread(target=open_browser, name="open-browser", daemon=True).start() # 打开浏览器页面
         threading.Thread(target=warm_up_mods, name="warm-up",      daemon=True).start() # 预热tiktoken模块
+        if get_conf('AUTO_OPEN_BROWSER'):
+            threading.Thread(target=open_browser, name="open-browser", daemon=True).start() # 打开浏览器页面
 
     # 运行一些异步任务：自动更新、打开浏览器页面、预热tiktoken模块
     run_delayed_tasks()

@@ -46,6 +46,16 @@ code_highlight_configs_block_mermaid = {
     },
 }
 
+
+mathpatterns = {
+    r"(?<!\\|\$)(\$)([^\$]+)(\$)": {"allow_multi_lines": False},  #  $...$
+    r"(?<!\\)(\$\$)([^\$]+)(\$\$)": {"allow_multi_lines": True},  # $$...$$
+    r"(?<!\\)(\\\[)(.+?)(\\\])": {"allow_multi_lines": False},  # \[...\]
+    r'(?<!\\)(\\\()(.+?)(\\\))': {'allow_multi_lines': False},                       # \(...\)
+    # r'(?<!\\)(\\begin{([a-z]+?\*?)})(.+?)(\\end{\2})': {'allow_multi_lines': True},  # \begin...\end
+    # r'(?<!\\)(\$`)([^`]+)(`\$)': {'allow_multi_lines': False},                       # $`...`$
+}
+
 def tex2mathml_catch_exception(content, *args, **kwargs):
     try:
         content = tex2mathml(content, *args, **kwargs)
@@ -96,14 +106,7 @@ def is_equation(txt):
         return False
     if "$" not in txt and "\\[" not in txt:
         return False
-    mathpatterns = {
-        r"(?<!\\|\$)(\$)([^\$]+)(\$)": {"allow_multi_lines": False},  #  $...$
-        r"(?<!\\)(\$\$)([^\$]+)(\$\$)": {"allow_multi_lines": True},  # $$...$$
-        r"(?<!\\)(\\\[)(.+?)(\\\])": {"allow_multi_lines": False},  # \[...\]
-        # r'(?<!\\)(\\\()(.+?)(\\\))': {'allow_multi_lines': False},                       # \(...\)
-        # r'(?<!\\)(\\begin{([a-z]+?\*?)})(.+?)(\\end{\2})': {'allow_multi_lines': True},  # \begin...\end
-        # r'(?<!\\)(\$`)([^`]+)(`\$)': {'allow_multi_lines': False},                       # $`...`$
-    }
+
     matches = []
     for pattern, property in mathpatterns.items():
         flags = re.ASCII | re.DOTALL if property["allow_multi_lines"] else re.ASCII
@@ -207,6 +210,61 @@ def fix_code_segment_indent(txt):
         return txt
 
 
+def fix_dollar_sticking_bug(txt):
+    """
+    修复不标准的dollar公式符号的问题
+    """
+    txt_result = ""
+    single_stack_height = 0
+    double_stack_height = 0
+    while True:
+        while True:
+            index = txt.find('$')
+
+            if index == -1:
+                txt_result += txt
+                return txt_result
+
+            if single_stack_height > 0:
+                if txt[:(index+1)].find('\n') > 0 or txt[:(index+1)].find('<td>') > 0 or txt[:(index+1)].find('</td>') > 0:
+                    print('公式之中出现了异常 (Unexpect element in equation)')
+                    single_stack_height = 0
+                    txt_result += ' $'
+                    continue
+
+            if double_stack_height > 0:
+                if txt[:(index+1)].find('\n\n') > 0:
+                    print('公式之中出现了异常 (Unexpect element in equation)')
+                    double_stack_height = 0
+                    txt_result += '$$'
+                    continue
+
+            is_double = (txt[index+1] == '$')
+            if is_double:
+                if single_stack_height != 0:
+                    # add a padding
+                    txt = txt[:(index+1)] + " " + txt[(index+1):]
+                    continue
+                if double_stack_height == 0:
+                    double_stack_height = 1
+                else:
+                    double_stack_height = 0
+                txt_result += txt[:(index+2)]
+                txt = txt[(index+2):]
+            else:
+                if double_stack_height != 0:
+                    # print(txt[:(index)])
+                    print('发现异常嵌套公式')
+                if single_stack_height == 0:
+                    single_stack_height = 1
+                else:
+                    single_stack_height = 0
+                    # print(txt[:(index)])
+                txt_result += txt[:(index+1)]
+                txt = txt[(index+1):]
+            break
+
+
 def markdown_convertion_for_file(txt):
     """
     将Markdown格式的文本转换为HTML格式。如果包含数学公式，则先将公式转换为HTML格式。
@@ -232,10 +290,10 @@ def markdown_convertion_for_file(txt):
 
     find_equation_pattern = r'<script type="math/tex(?:.*?)>(.*?)</script>'
     txt = fix_markdown_indent(txt)
+    convert_stage_1 = fix_dollar_sticking_bug(txt)
     # convert everything to html format
-    split = markdown.markdown(text="---")
-    convert_stage_1 = markdown.markdown(
-        text=txt,
+    convert_stage_2 = markdown.markdown(
+        text=convert_stage_1,
         extensions=[
             "sane_lists",
             "tables",
@@ -245,14 +303,24 @@ def markdown_convertion_for_file(txt):
         ],
         extension_configs={**markdown_extension_configs, **code_highlight_configs},
     )
-    convert_stage_1 = markdown_bug_hunt(convert_stage_1)
+
+
+    def repl_fn(match):
+        content = match.group(2)
+        return f'<script type="math/tex">{content}</script>'
+
+    pattern = "|".join([pattern for pattern, property in mathpatterns.items() if not property["allow_multi_lines"]])
+    pattern = re.compile(pattern, flags=re.ASCII)
+    convert_stage_3 = pattern.sub(repl_fn, convert_stage_2)
+
+    convert_stage_4 = markdown_bug_hunt(convert_stage_3)
 
     # 2. convert to rendered equation
-    convert_stage_2_2, n = re.subn(
-        find_equation_pattern, replace_math_render, convert_stage_1, flags=re.DOTALL
+    convert_stage_5, n = re.subn(
+        find_equation_pattern, replace_math_render, convert_stage_4, flags=re.DOTALL
     )
     # cat them together
-    return pre + convert_stage_2_2 + suf
+    return pre + convert_stage_5 + suf
 
 @lru_cache(maxsize=128)  # 使用 lru缓存 加快转换速度
 def markdown_convertion(txt):

@@ -62,7 +62,7 @@ def validate_path_safety(path_or_url, user):
     else:
         raise FriendlyException(f"输入文件的路径 ({path_or_url}) 存在，但位置非法。请将文件上传后再执行该任务。") # return False
     if sensitive_path:
-        allowed_users = [user, 'autogen', default_user_name]  # three user path that can be accessed
+        allowed_users = [user, 'autogen', 'arxiv_cache', default_user_name]  # three user path that can be accessed
         for user_allowed in allowed_users:
             if f"{os.sep}".join(path_or_url.split(os.sep)[:2]) == os.path.join(sensitive_path, user_allowed):
                 return True
@@ -81,7 +81,7 @@ def _authorize_user(path_or_url, request, gradio_app):
     if sensitive_path:
         token = request.cookies.get("access-token") or request.cookies.get("access-token-unsecure")
         user = gradio_app.tokens.get(token)  # get user
-        allowed_users = [user, 'autogen', default_user_name]  # three user path that can be accessed
+        allowed_users = [user, 'autogen', 'arxiv_cache', default_user_name]  # three user path that can be accessed
         for user_allowed in allowed_users:
             # exact match
             if f"{os.sep}".join(path_or_url.split(os.sep)[:2]) == os.path.join(sensitive_path, user_allowed):
@@ -99,7 +99,7 @@ class Server(uvicorn.Server):
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
         while not self.started:
-            time.sleep(1e-3)
+            time.sleep(5e-2)
 
     def close(self):
         self.should_exit = True
@@ -159,6 +159,7 @@ def start_app(app_block, CONCURRENT_COUNT, AUTHENTICATION, PORT, SSL_KEYFILE, SS
                     return "越权访问!"
             return await endpoint(path_or_url, request)
 
+    # --- --- enable TTS (text-to-speech) functionality --- ---
     TTS_TYPE = get_conf("TTS_TYPE")
     if TTS_TYPE != "DISABLE":
         # audio generation functionality
@@ -220,12 +221,20 @@ def start_app(app_block, CONCURRENT_COUNT, AUTHENTICATION, PORT, SSL_KEYFILE, SS
     fastapi_app = FastAPI(lifespan=app_lifespan)
     fastapi_app.mount(CUSTOM_PATH, gradio_app)
 
-    # --- --- favicon --- ---
+    # --- --- favicon and block fastapi api reference routes --- ---
+    from starlette.responses import JSONResponse
     if CUSTOM_PATH != '/':
         from fastapi.responses import FileResponse
         @fastapi_app.get("/favicon.ico")
         async def favicon():
             return FileResponse(app_block.favicon_path)
+
+        @fastapi_app.middleware("http")
+        async def middleware(request: Request, call_next):
+            if request.scope['path'] in ["/docs", "/redoc", "/openapi.json"]:
+                return JSONResponse(status_code=404, content={"message": "Not Found"})
+            response = await call_next(request)
+            return response
 
     # --- --- uvicorn.Config --- ---
     ssl_keyfile = None if SSL_KEYFILE == "" else SSL_KEYFILE

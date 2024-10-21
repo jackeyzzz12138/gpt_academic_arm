@@ -1,8 +1,8 @@
 name: Sync with Upstream
 
 on:
-  schedule:
-    - cron: "0 6 * * 1,4,6" # 周一周四周日6点(UTC)触发
+  # schedule:
+  #   - cron: "0 6 * * 0" # 周一周四周日6点(UTC)触发
   workflow_dispatch: # 允许手动触发
 
 jobs:
@@ -31,30 +31,3 @@ jobs:
           base: arm
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # - name: Checkout
-      #   uses: actions/checkout@v4
-      #   with:
-      #     fetch-depth: 0
-
-      # - name: Sync with Upstream
-      #   uses: repo-sync/github-sync@v2
-      #   with:
-      #     source_repo: "binary-husky/gpt_academic"
-      #     source_branch: "master" # 上游仓库的默认分支
-      #     destination_branch: "master" # 你的分支
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      # - name: Add remote upstream
-      #   run: git remote add upstream https://github.com/binary-husky/gpt_academic.git
-
-      # - name: Checkout ARM Branch
-      #   run: git checkout arm
-
-      # - name: Merge Master into ARM
-      #   run: |
-      #     git config --global user.email "github-actions@github.com"
-      #     git config --global user.name "github-actions"
-      #     git merge origin/master --no-edit
-      #     git push origin arm
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

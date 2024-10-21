@@ -1,4 +1,5 @@
 > [!WARNING]
+> ***由于主仓库现已支持arm版本docker镜像，本仓库的镜像更新可能会停滞了，未来也可能直接贡献给上游仓库。***   
 > 本仓库只提供上游仓库的 arm docker 镜像, 欢迎issue和PR。  
 > 由于仓库名称变更，导致package名称变更，请使用 
 > ``` docker pull ghcr.io/jackeyzzz12138/gpt_academic_arm_with_latex_arm:arm ``` 以拉取最新的镜像。
